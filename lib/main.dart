@@ -1,7 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+
+import 'models/task.dart';
+
+enum CheckDayStatus { yesterday, today, tomorrow, others }
+
+// utils
+CheckDayStatus checkDay(DateTime dateToCheck) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = DateTime(now.year, now.month, now.day - 1);
+  final tomorrow = DateTime(now.year, now.month, now.day + 1);
+
+  final date = DateTime(dateToCheck.year, dateToCheck.month, dateToCheck.day);
+
+  if (date == today)
+    return CheckDayStatus.today;
+  else if (date == yesterday)
+    return CheckDayStatus.yesterday;
+  else if (date == tomorrow) return CheckDayStatus.tomorrow;
+
+  return CheckDayStatus.others;
+}
+
+String formatTaskDateTime(DateTime d) {
+  final status = checkDay(d);
+  if (status == CheckDayStatus.today)
+    return 'today';
+  else if (status == CheckDayStatus.yesterday)
+    return 'yesterday';
+  else if (status == CheckDayStatus.tomorrow) return 'tomorrow';
+
+  return DateFormat.yMMMMd().format(d);
+}
 
 void main() {
-  runApp(MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => TaskModel(),
+      child: MyApp(),
+    ),
+  );
 }
 
 class BrandColors {
@@ -13,13 +54,6 @@ class Brand {
 }
 
 final brand = Brand();
-
-class TaskItem {
-  TaskItem({required this.name, required this.addedAt});
-
-  final String name;
-  final String addedAt;
-}
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -42,11 +76,6 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-final taskItems = [
-  TaskItem(name: "Task 1", addedAt: "Yesterday"),
-  TaskItem(name: "Task 2", addedAt: "Today")
-];
-
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
@@ -58,18 +87,73 @@ class _MyHomePageState extends State<MyHomePage> {
           widget.title,
           style: TextStyle(color: Colors.white),
         ),
+        leading: GestureDetector(
+          onTap: () {
+            print("Open the app menu");
+          },
+          child: Icon(
+            Icons.menu, // add custom icons also
+          ),
+        ),
+        actions: <Widget>[
+          Padding(
+              padding: EdgeInsets.only(right: 20.0),
+              child: GestureDetector(
+                onTap: () {
+                  print("Open search bar");
+                },
+                child: Icon(
+                  Icons.search,
+                  size: 26.0,
+                ),
+              )),
+          Consumer<TaskModel>(builder: (context, taskModel, child) {
+            return Padding(
+                padding: EdgeInsets.only(right: 20.0),
+                child: PopupMenuButton<String>(
+                  onSelected: (selected) {
+                    switch (selected) {
+                      case 'Hide Completed Tasks':
+                      case 'Show Completed Tasks':
+                        taskModel.toggleShowCompletedTasks();
+                        return;
+                    }
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return {
+                      taskModel.showCompletedTasks
+                          ? 'Hide Completed Tasks'
+                          : 'Show Completed Tasks'
+                    }.map((String choice) {
+                      return PopupMenuItem<String>(
+                        value: choice,
+                        child: Text(choice),
+                      );
+                    }).toList();
+                  },
+                ));
+          })
+        ],
       ),
       body: Center(
-        child: Column(
-          children: taskItems
-              .map(
-                  (task) => TaskRow(addedAt: task.addedAt, taskName: task.name))
-              .toList(),
-        ),
+        child: Consumer<TaskModel>(builder: (context, taskModel, child) {
+          return Column(
+            children: taskModel.items
+                .map((task) => TaskRow(
+                      taskName: task.name,
+                      completed: task.completed,
+                      addedAt: formatTaskDateTime(task.addedAt),
+                      onPressLeadingIcon: () {
+                        taskModel.toggleTaskCompleteStatus(task.id);
+                      },
+                    ))
+                .toList(),
+          );
+        }),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _modalBottomSheetMenu(context);
+          showPZBottomSheet(context, AddTaskView());
         },
         tooltip: 'Add Task',
         child: Icon(Icons.add),
@@ -86,13 +170,15 @@ class TaskRow extends StatelessWidget {
       required this.taskName,
       this.onTap,
       this.onLongPress,
-      this.leadingTooltip = "",
+      this.completed = false,
+      this.leadingTooltip,
       this.onPressLeadingIcon})
       : super(key: key);
 
+  final bool completed;
   final String addedAt;
   final String taskName;
-  final String leadingTooltip;
+  final String? leadingTooltip;
 
   final Function? onTap;
   final Function? onLongPress;
@@ -101,8 +187,12 @@ class TaskRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-        title: Text(taskName),
-        subtitle: Text(addedAt),
+        title: Text(
+          taskName,
+          style: TextStyle(
+              decoration: completed ? TextDecoration.lineThrough : null),
+        ),
+        subtitle: Text(addedAt[0].toUpperCase() + addedAt.substring(1)),
         onTap: () {
           if (onTap != null) onTap!();
         },
@@ -115,7 +205,8 @@ class TaskRow extends StatelessWidget {
           onPressed: () {
             if (onPressLeadingIcon != null) onPressLeadingIcon!();
           },
-          icon: Icon(Icons.circle_outlined),
+          icon: Icon(
+              completed ? Icons.check_circle_outlined : Icons.circle_outlined),
           tooltip: leadingTooltip,
         ));
   }
@@ -145,28 +236,33 @@ class _AddTaskViewState extends State<AddTaskView> {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
       children: <Widget>[
-        TextField(
-          controller: _txtController,
-          minLines: 1,
-          maxLines: 6,
-          onChanged: (text) {
-            _txtController.value = _txtController.value.copyWith(
-              text: text,
-              selection: TextSelection.collapsed(offset: text.length),
-            );
-          },
-          decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.all(18),
-              suffixIcon: IconButton(
-                  icon: Icon(Icons.send),
-                  onPressed: () {
-                    print("Add a tasks");
-                    Navigator.pop(context);
-                  },
-                  splashColor: Colors.transparent),
-              hintText: "e.g. Buy eggs for breakfast"),
-        ),
+        Consumer<TaskModel>(builder: (context, taskModel, child) {
+          return TextField(
+            controller: _txtController,
+            minLines: 1,
+            maxLines: 6,
+            onChanged: (text) {
+              _txtController.value = _txtController.value.copyWith(
+                text: text,
+                selection: TextSelection.collapsed(offset: text.length),
+              );
+            },
+            decoration: InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(18),
+                suffixIcon: IconButton(
+                    icon: Icon(Icons.send),
+                    onPressed: () {
+                      taskModel.add(TaskItem(
+                          name: _txtController.text,
+                          addedAt: DateTime.now(),
+                          id: Uuid().v4()));
+                      Navigator.pop(context);
+                    },
+                    splashColor: Colors.transparent),
+                hintText: "e.g. Buy eggs for breakfast"),
+          );
+        }),
         Row(
           children: [
             Column(
@@ -273,11 +369,16 @@ double calculateRiceScore(
   return (reach * impact * confidence) / effort;
 }
 
-void _modalBottomSheetMenu(BuildContext context) {
+void showPZBottomSheet(BuildContext context, Widget? child) {
+  // the isScrollControlled and padding avoids the device keyboard
   showModalBottomSheet(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       builder: (context) {
-        return AddTaskView();
+        return Container(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: child);
       });
 }
