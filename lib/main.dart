@@ -251,6 +251,7 @@ class _AddTaskViewState extends State<AddTaskView> {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.all(18),
                 suffixIcon: IconButton(
+                    color: brand.colors.primary,
                     icon: Icon(Icons.send),
                     onPressed: () {
                       taskModel.add(TaskItem(
