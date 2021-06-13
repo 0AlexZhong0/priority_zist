@@ -11,9 +11,7 @@ A task list built using Flutter, that helps you to prioritize using the RICE fra
 
 ## Frontend MVP
 
-- edit the task from the bottom sheet from tapping on the task.
-  - the same interface with the AddTaskView except this time it has the values known ahead of time.
-- delete the task on long press.
+- sort the tasks based on the score of the RICE framework
 - think of a data structure that will fit arbitary parameters where a custom formula for sorting the priority.
 - declare the data structure in the app and sort the tasks based on the formula.
 - change the delete from on long press to swipe to left.

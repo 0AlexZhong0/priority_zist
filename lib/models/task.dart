@@ -2,17 +2,46 @@ import 'package:flutter/foundation.dart';
 
 class TaskItem {
   TaskItem(
-      {required this.name,
+      {required this.id,
+      required this.name,
+      required this.reach,
+      required this.impact,
+      required this.confidence,
+      required this.effort,
       required this.addedAt,
-      required this.id,
       this.completed = false});
 
   final String id;
   final DateTime addedAt;
 
-  // the name and completed can be updated
+  // the values below can be updated
+  double reach;
+  double impact;
+  double confidence;
+  double effort;
+
   String name;
   bool completed;
+}
+
+class EditTaskInput {
+  EditTaskInput(
+      {required this.id,
+      this.reach,
+      this.impact,
+      this.confidence,
+      this.effort,
+      this.name});
+
+  final String id;
+
+  final double? reach;
+  final double? impact;
+  final double? confidence;
+  final double? effort;
+
+  // the name and completed can be updated
+  final String? name;
 }
 
 class TaskModel extends ChangeNotifier {
@@ -39,7 +68,7 @@ class TaskModel extends ChangeNotifier {
   }
 
   void toggleTaskCompleteStatus(String id) {
-    final taskIdx = _taskItems.indexWhere((item) => item.id == id);
+    final taskIdx = _taskIdxById(id);
     if (taskIdx == -1) return;
 
     var task = _taskItems[taskIdx];
@@ -52,5 +81,42 @@ class TaskModel extends ChangeNotifier {
   void toggleShowCompletedTasks() {
     showCompletedTasks = !showCompletedTasks;
     notifyListeners();
+  }
+
+  void deleteTask(String id) {
+    final taskIdx = _taskIdxById(id);
+    if (taskIdx == -1) return;
+
+    _taskItems.removeAt(taskIdx);
+
+    notifyListeners();
+  }
+
+  void editTask(EditTaskInput input) {
+    final taskIdx = _taskIdxById(input.id);
+
+    if (taskIdx == -1) return;
+
+    if (input.reach != null) {
+      _taskItems[taskIdx].reach = input.reach!;
+    }
+    if (input.impact != null) {
+      _taskItems[taskIdx].impact = input.impact!;
+    }
+    if (input.confidence != null) {
+      _taskItems[taskIdx].confidence = input.confidence!;
+    }
+    if (input.effort != null) {
+      _taskItems[taskIdx].effort = input.effort!;
+    }
+    if (input.name != null) {
+      _taskItems[taskIdx].name = input.name!;
+    }
+
+    notifyListeners();
+  }
+
+  int _taskIdxById(String id) {
+    return _taskItems.indexWhere((item) => item.id == id);
   }
 }

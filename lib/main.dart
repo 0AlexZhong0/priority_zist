@@ -137,17 +137,63 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Center(
         child: Consumer<TaskModel>(builder: (context, taskModel, child) {
+          void _onDeleteTask(String id) {
+            taskModel.deleteTask(id);
+
+            Navigator.pop(context);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: const Text('Task deleted')),
+            );
+          }
+
           return Column(
-            children: taskModel.items
-                .map((task) => TaskRow(
-                      taskName: task.name,
-                      completed: task.completed,
-                      addedAt: formatTaskDateTime(task.addedAt),
-                      onPressLeadingIcon: () {
-                        taskModel.toggleTaskCompleteStatus(task.id);
-                      },
-                    ))
-                .toList(),
+            children: taskModel.items.length == 0
+                ? [
+                    Container(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Text('No tasks', style: TextStyle(fontSize: 24)))
+                  ]
+                : taskModel.items
+                    .map((task) => TaskRow(
+                          taskName: task.name,
+                          completed: task.completed,
+                          addedAt: formatTaskDateTime(task.addedAt),
+                          onTap: () {
+                            showPZBottomSheet(
+                                context, EditTaskView(task: task));
+                          },
+                          onLongPress: () {
+                            showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return SimpleDialog(
+                                    title: Text('Actions'),
+                                    children: <Widget>[
+                                      SimpleDialogOption(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                        },
+                                        child: ListTile(
+                                            leading: IconButton(
+                                                icon: Icon(Icons.delete),
+                                                onPressed: () {
+                                                  _onDeleteTask(task.id);
+                                                }),
+                                            title: Text("Delete Task"),
+                                            onTap: () {
+                                              _onDeleteTask(task.id);
+                                            }),
+                                      ),
+                                    ],
+                                  );
+                                });
+                          },
+                          onPressLeadingIcon: () {
+                            taskModel.toggleTaskCompleteStatus(task.id);
+                          },
+                        ))
+                    .toList(),
           );
         }),
       ),
@@ -212,6 +258,175 @@ class TaskRow extends StatelessWidget {
   }
 }
 
+class EditTaskView extends StatefulWidget {
+  final TaskItem task;
+
+  const EditTaskView({required this.task});
+
+  @override
+  _EditTaskViewState createState() => _EditTaskViewState(
+      impact: task.impact,
+      reach: task.reach,
+      confidence: task.confidence,
+      effort: task.effort);
+}
+
+class _EditTaskViewState extends State<EditTaskView> {
+  double reach;
+  double impact;
+  double effort;
+  double confidence;
+
+  _EditTaskViewState(
+      {required this.impact,
+      required this.reach,
+      required this.confidence,
+      required this.effort});
+
+  @override
+  Widget build(BuildContext context) {
+    var _txtController = TextEditingController(text: widget.task.name);
+
+    return Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: <Widget>[
+          Consumer<TaskModel>(builder: (context, taskModel, child) {
+            return TextField(
+              autofocus: true,
+              controller: _txtController,
+              minLines: 1,
+              maxLines: 6,
+              onChanged: (text) {
+                _txtController.value = _txtController.value.copyWith(
+                  text: text,
+                  selection: TextSelection.collapsed(offset: text.length),
+                );
+              },
+              decoration: InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.all(18),
+                  suffixIcon: IconButton(
+                      color: brand.colors.primary,
+                      icon: Icon(Icons.send),
+                      onPressed: () {
+                        taskModel.editTask(EditTaskInput(
+                            id: widget.task.id,
+                            name: _txtController.text,
+                            reach: reach,
+                            impact: impact,
+                            confidence: confidence,
+                            effort: effort));
+
+                        Navigator.pop(context);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: const Text('Successful Edit')),
+                        );
+                      },
+                      splashColor: Colors.transparent),
+                  hintText: "e.g. Buy eggs for breakfast"),
+            );
+          }),
+          Row(
+            children: [
+              Column(
+                children: [
+                  Text(
+                    "Reach",
+                  ),
+                  Slider(
+                    activeColor: brand.colors.primary,
+                    value: reach,
+                    min: 1,
+                    max: 6,
+                    divisions: 5,
+                    label: reach.round().toString(),
+                    onChanged: (double value) {
+                      setState(() {
+                        reach = value;
+                      });
+                    },
+                  )
+                ],
+              ),
+              Column(
+                children: [
+                  Text(
+                    "Impact",
+                  ),
+                  Slider(
+                    min: 1,
+                    max: 4,
+                    divisions: 3,
+                    value: impact,
+                    activeColor: brand.colors.primary,
+                    label: impact.round().toString(),
+                    onChanged: (double value) {
+                      setState(() {
+                        impact = value;
+                      });
+                    },
+                  )
+                ],
+              )
+            ],
+          ),
+          Row(
+            children: [
+              Column(
+                children: [
+                  Text(
+                    "Confidence",
+                  ),
+                  Slider(
+                    min: 1,
+                    max: 100,
+                    divisions: 99,
+                    value: confidence,
+                    activeColor: brand.colors.primary,
+                    label: confidence.round().toString(),
+                    onChanged: (double value) {
+                      setState(() {
+                        confidence = value;
+                      });
+                    },
+                  )
+                ],
+              ),
+              Column(
+                children: [
+                  Text(
+                    "Effort",
+                  ),
+                  Slider(
+                    min: 1,
+                    max: 6,
+                    divisions: 5,
+                    value: effort,
+                    activeColor: brand.colors.primary,
+                    label: effort.round().toString(),
+                    onChanged: (double value) {
+                      setState(() {
+                        effort = value;
+                      });
+                    },
+                  )
+                ],
+              )
+            ],
+          ),
+          Container(
+            margin: EdgeInsets.only(bottom: 18),
+            child: Text(
+              "RICE Score: ${calculateRiceScore(reach, impact, confidence, effort).toStringAsFixed(1)}",
+              style: TextStyle(fontSize: 22, fontStyle: FontStyle.italic),
+            ),
+          )
+        ]);
+  }
+}
+
 class AddTaskView extends StatefulWidget {
   @override
   _AddTaskViewState createState() => _AddTaskViewState();
@@ -238,6 +453,7 @@ class _AddTaskViewState extends State<AddTaskView> {
       children: <Widget>[
         Consumer<TaskModel>(builder: (context, taskModel, child) {
           return TextField(
+            autofocus: true,
             controller: _txtController,
             minLines: 1,
             maxLines: 6,
@@ -255,9 +471,14 @@ class _AddTaskViewState extends State<AddTaskView> {
                     icon: Icon(Icons.send),
                     onPressed: () {
                       taskModel.add(TaskItem(
-                          name: _txtController.text,
-                          addedAt: DateTime.now(),
-                          id: Uuid().v4()));
+                        id: Uuid().v4(),
+                        reach: _reach,
+                        impact: _impact,
+                        confidence: _confidence,
+                        effort: _effort,
+                        addedAt: DateTime.now(),
+                        name: _txtController.text,
+                      ));
                       Navigator.pop(context);
                     },
                     splashColor: Colors.transparent),
